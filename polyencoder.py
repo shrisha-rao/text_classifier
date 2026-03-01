@@ -118,7 +118,6 @@ class PolyencoderModel(nn.Module):
         text_global_contexts = self.encode_text(texts)  # [B, num_global, D]
 
         # 3. Reconstruct batch structure using torch.split
-        # This is much safer than manual indexing
         embeddings_split = torch.split(label_embeddings, label_counts)
 
         max_num_label = self.max_num_labels
@@ -140,15 +139,27 @@ class PolyencoderModel(nn.Module):
                 mask[i, :actual_count] = 1
 
         # 4. Compute scores (Late Interaction)
+        # scores_raw: [B, max_label, num_global]
+        scores_raw = torch.matmul(padded_label_embeddings,
+                                  text_global_contexts.transpose(1, 2))
+
+        temperature = 0.1  # low: sharp attention (~max) high: smooth att
+        scores_raw = scores_raw / temperature
+        # Soft attention over global vectors
+        attn_weights = torch.softmax(scores_raw,
+                                     dim=-1)  # [B, max_label, num_global]
+        scores = (attn_weights * scores_raw).sum(dim=-1)  # [B, max_label]
+        return scores, mask
+
         # label_embs: [B, max_label, 1, D]
         # global_ctx: [B, 1, num_global, D]
-        scores = torch.matmul(padded_label_embeddings,
-                              text_global_contexts.transpose(1, 2))
+        # scores = torch.matmul(padded_label_embeddings,
+        #                       text_global_contexts.transpose(1, 2))
 
-        # Max over global vectors
-        scores, _ = scores.max(dim=-1)  # [B, max_label]
+        # # Max over global vectors
+        # scores, _ = scores.max(dim=-1)  # [B, max_label]
         # scores = scores / self.temperature
-        return scores, mask
+        # return scores, mask
 
     @torch.no_grad()
     def forward_predict(self, texts, labels):
