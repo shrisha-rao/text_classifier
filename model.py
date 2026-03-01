@@ -145,7 +145,7 @@ class BiEncoderModel(nn.Module):
         if not os.path.isdir(path):
             print(f"Resolving {path} from hf...")
             # downloads the repo to the HF cache and returns the cache directory path
-            local_dir = snapshot_download(repo_id)
+            local_dir = snapshot_download(path)
         else:
             local_dir = path
 
