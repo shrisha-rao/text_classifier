@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoTokenizer, BertConfig, AutoConfig
+from transformers import AutoModel, AutoTokenizer, BertConfig
 from pathlib import Path
 
 
@@ -123,33 +123,73 @@ class BiEncoderModel(nn.Module):
 
     def save_pretrained(self, path):
         save_dir = Path(path)
-        self.config.max_num_labels = self.max_num_labels
-        self.shared_encoder.config.max_num_labels = self.max_num_labels
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save encoder
         self.shared_encoder.save_pretrained(save_dir)
         self.tokenizer.save_pretrained(save_dir)
-        torch.save(self.projection.state_dict(), save_dir / 'projection.pt')
-        if hasattr(self, 'temperature'):
-            torch.save(self.temperature, save_dir / 'temperature.pt')
+
+        # Save full BiEncoder state_dict
+        torch.save(self.state_dict(), save_dir / "biencoder.pt")
+
+        # Save custom attributes
+        self.config.max_num_labels = self.max_num_labels
+        self.config.save_pretrained(save_dir)
 
     @classmethod
-    def from_pretrained(cls, path, max_num_labels=None):
-        # config = PretrainedConfig.from_pretrained(path)
-        config = BertConfig.from_pretrained(path)
-        default_base_model_name = "bert-base-uncased"  #"prajjwal1/bert-tiny"
-        if max_num_labels is None:
-            max_num_labels = getattr(config, 'max_num_labels', 5)
-        # base_model_name = getattr(config, 'model_type',
-        #                           default_base_model_name)
-        base_model_name = default_base_model_name
-        model = cls(base_model_name, max_num_labels)
-        # Load weights using the correctly typed config
+    def from_pretrained(cls, path):
+
         load_dir = Path(path)
-        model.shared_encoder = AutoModel.from_pretrained(load_dir,
-                                                         config=config)
-        model.tokenizer = AutoTokenizer.from_pretrained(load_dir)
-        model.projection.load_state_dict(torch.load(load_dir /
-                                                    'projection.pt'))
-        tmp_path = load_dir / 'temperature.pt'
-        if tmp_path.exists():
-            model.temperature.data = torch.load(tmp_path)
+
+        # Load config
+        config = BertConfig.from_pretrained(load_dir)
+        max_num_labels = getattr(config, "max_num_labels", 5)
+
+        # Initialize model
+        model = cls(model_name=load_dir, max_num_labels=max_num_labels)
+
+        # Load full state_dict
+        state_dict = torch.load(load_dir / "biencoder.pt", map_location="cpu")
+        model.load_state_dict(state_dict)
+
         return model
+
+    # def save_pretrained(self, path):
+    #     save_dir = Path(path)
+    #     self.config.max_num_labels = self.max_num_labels
+    #     self.shared_encoder.config.max_num_labels = self.max_num_labels
+    #     self.shared_encoder.save_pretrained(save_dir)
+    #     self.tokenizer.save_pretrained(save_dir)
+    #     torch.save(self.projection.state_dict(), save_dir / 'projection.pt')
+    #     if hasattr(self, 'temperature'):
+    #         torch.save(self.temperature, save_dir / 'temperature.pt')
+
+    # @classmethod
+    # def from_pretrained(cls, path, max_num_labels=None):
+    #     # config = PretrainedConfig.from_pretrained(path)
+    #     config = BertConfig.from_pretrained(path)
+    #     default_base_model_name = "bert-base-uncased"  #"prajjwal1/bert-tiny"
+    #     if max_num_labels is None:
+    #         max_num_labels = getattr(config, 'max_num_labels', 5)
+    #     # base_model_name = getattr(config, 'model_type',
+    #     #                           default_base_model_name)
+    #     base_model_name = default_base_model_name
+    #     model = cls(base_model_name, max_num_labels)
+    #     # Load weights using the correctly typed config
+    #     # load_dir = Path(path)
+    #     model.shared_encoder = AutoModel.from_pretrained(path, config=config)
+    #     model.tokenizer = AutoTokenizer.from_pretrained(path)
+
+    #     # projection_path = hf_hub_download(repo_name, "projection.pt")
+    #     # model.projection.load_state_dict(
+    #     #     torch.load(projection_path, map_location="cpu"))
+    #     # temperature_path = hf_hub_download(repo_name, "temperature.pt")
+    #     try:  #local files
+    #         tmp_path = load_dir / 'temperature.pt'
+    #         model.temperature.data = torch.load(tmp_path)
+    #         model.projection.load_state_dict(
+    #             torch.load(path + '/projection.pt'))
+    #     except:
+    #         pass
+
+    #     return model

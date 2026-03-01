@@ -175,47 +175,86 @@ class PolyencoderModel(nn.Module):
 
     def save_pretrained(self, path):
         save_dir = Path(path)
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        # Store custom attributes in config
         self.shared_encoder.config.max_num_labels = self.max_num_labels
         self.shared_encoder.config.num_global_vectors = self.num_global_vectors
+
+        # Save encoder + config
         self.shared_encoder.save_pretrained(save_dir)
         self.tokenizer.save_pretrained(save_dir)
-        # Save poly-specific params
-        torch.save({'global_vectors': self.global_vectors},
-                   save_dir / "poly_extra.pt")
-        if hasattr(self, 'temperature'):
-            torch.save(self.temperature, save_dir / 'temperature.pt')
+
+        # Save FULL Polyencoder state
+        torch.save(self.state_dict(), save_dir / "polyencoder.pt")
 
     @classmethod
     def from_pretrained(cls, path):
-        default_base_model_name = "bert-base-uncased"
-        try:
-            config = AutoConfig.from_pretrained(path)
-        except ValueError:
-            # Fallback: If the saved config is broken, load the base config
-            # but apply the state dict from the path later
-            print(
-                f"Warning: Could not determine model type from {path}. Falling back to bert-base-uncased."
-            )
-            config = AutoConfig.from_pretrained(default_base_model_name)
 
-        try:
-            max_num_labels = getattr(config, 'max_num_labels', 5)
-            num_global_vectors = getattr(config, 'num_global_vectors', 16)
-        except Exception:
-            max_num_labels = 5
-            num_global_vectors = 16
+        load_dir = Path(path)
 
-        base_model_name = getattr(config, '_name_or_path', None)
-        if not base_model_name:
-            base_model_name = getattr(config, 'model_type',
-                                      default_base_model_name)
-            if not base_model_name:
-                base_model_name = default_base_model_name
+        # Load config
+        config = AutoConfig.from_pretrained(load_dir)
 
-        model = cls(config._name_or_path, max_num_labels, num_global_vectors)
-        model.shared_encoder = AutoModel.from_pretrained(path, config=config)
-        model.tokenizer = AutoTokenizer.from_pretrained(path)
-        extra = torch.load(f"{path}/poly_extra.pt")
-        model.global_vectors = nn.Parameter(extra['global_vectors'])
-        model.temperature.data = torch.load(f'{path}/temperature.pt')
+        max_num_labels = getattr(config, "max_num_labels", 5)
+        num_global_vectors = getattr(config, "num_global_vectors", 64)
+
+        # Initialize model
+        model = cls(model_name=load_dir,
+                    max_num_labels=max_num_labels,
+                    max_seq_length=getattr(config, "max_seq_length", 128),
+                    num_global_vectors=num_global_vectors)
+
+        # Load full state_dict
+        state_dict = torch.load(load_dir / "polyencoder.pt",
+                                map_location="cpu")
+        model.load_state_dict(state_dict)
+
         return model
+
+    # def save_pretrained(self, path):
+    #     save_dir = Path(path)
+    #     self.shared_encoder.config.max_num_labels = self.max_num_labels
+    #     self.shared_encoder.config.num_global_vectors = self.num_global_vectors
+    #     self.shared_encoder.save_pretrained(save_dir)
+    #     self.tokenizer.save_pretrained(save_dir)
+    #     # Save poly-specific params
+    #     torch.save({'global_vectors': self.global_vectors},
+    #                save_dir / "poly_extra.pt")
+    #     if hasattr(self, 'temperature'):
+    #         torch.save(self.temperature, save_dir / 'temperature.pt')
+
+    # @classmethod
+    # def from_pretrained(cls, path):
+    #     default_base_model_name = "bert-base-uncased"
+    #     try:
+    #         config = AutoConfig.from_pretrained(path)
+    #     except ValueError:
+    #         # Fallback: If the saved config is broken, load the base config
+    #         # but apply the state dict from the path later
+    #         print(
+    #             f"Warning: Could not determine model type from {path}. Falling back to bert-base-uncased."
+    #         )
+    #         config = AutoConfig.from_pretrained(default_base_model_name)
+
+    #     try:
+    #         max_num_labels = getattr(config, 'max_num_labels', 5)
+    #         num_global_vectors = getattr(config, 'num_global_vectors', 16)
+    #     except Exception:
+    #         max_num_labels = 5
+    #         num_global_vectors = 16
+
+    #     base_model_name = getattr(config, '_name_or_path', None)
+    #     if not base_model_name:
+    #         base_model_name = getattr(config, 'model_type',
+    #                                   default_base_model_name)
+    #         if not base_model_name:
+    #             base_model_name = default_base_model_name
+
+    #     model = cls(config._name_or_path, max_num_labels, num_global_vectors)
+    #     model.shared_encoder = AutoModel.from_pretrained(path, config=config)
+    #     model.tokenizer = AutoTokenizer.from_pretrained(path)
+    #     extra = torch.load(f"{path}/poly_extra.pt")
+    #     model.global_vectors = nn.Parameter(extra['global_vectors'])
+    #     model.temperature.data = torch.load(f'{path}/temperature.pt')
+    #     return model
