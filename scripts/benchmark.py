@@ -13,9 +13,16 @@ import time
 import numpy as np
 import torch
 from sklearn.metrics import f1_score, precision_recall_fscore_support, roc_auc_score, precision_recall_curve
-
-# Import your model classes (must be in PYTHONPATH)
+from dataset import ZeroShotDataset
 from model import BiEncoderModel  #, PolyencoderModel
+from torch.utils.data import Dataset, DataLoader
+
+
+def collate_fn(batch):
+    texts = [item["text"] for item in batch]
+    labels = [item["labels"] for item in batch]
+    targets = [item["targets"] for item in batch]
+    return {"texts": texts, "labels": labels, "targets": targets}
 
 
 def load_test_data(path):
@@ -53,122 +60,129 @@ def compute_optimal_threshold(y_true, probs, num_steps=100):
     return best_thresh, best_f1
 
 
-def evaluate_model(model, test_data, global_labels, device, threshold=0.5):
-    """
-    Run inference on test data and compute metrics.
+import torch
+import time
+from sklearn.metrics import roc_auc_score
 
-    Args:
-        model: PyTorch model (BiEncoderModel or PolyencoderModel)
-        test_data: list of dicts with 'text' and 'labels'
-        global_labels: list of all possible labels (candidate set)
-        device: torch device
-        threshold: score threshold for binary prediction
 
-    Returns:
-        dict of metrics
+def benchmark_model(model, dataloader, device, threshold=0.5):
     """
+    Benchmark model using:
+      - Micro Precision
+      - Micro Recall
+      - Micro F1
+      - AUC
+
+    Metrics computed only over each text's candidate labels.
+    """
+
     model.eval()
     model.to(device)
 
-    label_to_idx = {lbl: i for i, lbl in enumerate(global_labels)}
-    num_labels = len(global_labels)
-
-    all_true = []  # list of multi‑hot vectors (list of ints)
-    all_scores = []  # list of score vectors (same order as global_labels)
+    all_probs = []
+    all_targets = []
     inference_times = []
 
     with torch.no_grad():
-        for sample in test_data:
-            text = sample["text"]
-            true_labels = sample["labels"]  # ground truth list
+        for batch in dataloader:
 
-            # Prepare candidate list (all global labels)
-            candidates = global_labels
+            texts = batch["texts"]
+            labels = batch["labels"]
+            targets_list = batch["targets"]
 
-            # Measure inference time
+            # ---- Accurate GPU timing ----
+            if device == "cuda":
+                torch.cuda.synchronize()
             start = time.time()
-            # forward_predict expects lists: [text], [candidates]
-            result = model.forward_predict([text], [candidates])[0]
+
+            scores, mask = model(texts, labels)
+
+            if device == "cuda":
+                torch.cuda.synchronize()
             end = time.time()
+
             inference_times.append(end - start)
 
-            # Build true multi‑hot vector
-            true_vec = [0] * num_labels
-            for lbl in true_labels:
-                if lbl in label_to_idx:
-                    true_vec[label_to_idx[lbl]] = 1
+            # ---- Build target tensor ----
+            target_tensor = torch.zeros_like(scores, device=device)
 
-            # Build score vector (sigmoid probabilities already)
-            score_vec = [0.0] * num_labels
-            for lbl, score in result["scores"].items():
-                if lbl in label_to_idx:
-                    score_vec[label_to_idx[lbl]] = score
+            for i, tgt_list in enumerate(targets_list):
+                max_labels = min(len(tgt_list), model.max_num_labels)
+                target_tensor[i, :max_labels] = torch.tensor(
+                    tgt_list[:max_labels], device=device)
 
-            # pred_vec = [1 if score >= threshold else 0 for score in score_vec]
+            # Keep only valid (non-padded) positions
+            valid_scores = scores[mask]
+            valid_targets = target_tensor[mask]
 
-            all_true.append(true_vec)
-            all_scores.append(score_vec)
+            probs = torch.sigmoid(valid_scores)
 
-    # Convert to numpy arrays
-    y_true = np.array(all_true)  # shape (n_samples, n_labels)
-    y_scores = np.array(all_scores)  # shape (n_samples, n_labels)
-    print(y_scores.min().item(), y_scores.max().item())
+            all_probs.append(probs.cpu())
+            all_targets.append(valid_targets.cpu())
 
-    best_thresh, _ = compute_optimal_threshold(y_true, y_scores)
-    best_thresh = 0.5
-    y_pred = (y_scores >= best_thresh).astype(int)
+    # ---- Concatenate all batches ----
+    probs = torch.cat(all_probs)
+    targets = torch.cat(all_targets)
 
-    # Micro averaged metrics (treat each label independently)
-    micro_p, micro_r, micro_f, _ = precision_recall_fscore_support(
-        y_true.ravel(), y_pred.ravel(), average='binary', zero_division=0)
+    preds = (probs >= threshold).float()
 
-    # Macro averaged metrics (average per label scores)
-    macro_p, macro_r, macro_f, _ = precision_recall_fscore_support(
-        y_true, y_pred, average='macro', zero_division=0)
+    # ---- Micro metrics ----
+    TP = (preds * targets).sum()
+    FP = (preds * (1 - targets)).sum()
+    FN = ((1 - preds) * targets).sum()
 
-    # Compute per label AUC and then average (macro AUC)
-    auc_per_label = []
-    for i in range(num_labels):
-        # Skip if only one class present
-        if len(np.unique(y_true[:, i])) < 2:
-            continue
-        try:
-            auc = roc_auc_score(y_true[:, i], y_scores[:, i])
-            auc_per_label.append(auc)
-        except ValueError:
-            # In case of issues (e.g., all scores constant), skip
-            pass
-    macro_auc = np.mean(auc_per_label) if auc_per_label else 0.0
+    micro_precision = TP / (TP + FP + 1e-8)
+    micro_recall = TP / (TP + FN + 1e-8)
+    micro_f1 = 2 * micro_precision * micro_recall / (micro_precision +
+                                                     micro_recall + 1e-8)
 
-    avg_time = np.mean(inference_times)
+    # ---- AUC ----
+    try:
+        auc = roc_auc_score(targets.numpy(), probs.numpy())
+    except ValueError:
+        auc = 0.0
+
+    avg_batch_time_ms = sum(inference_times) / len(inference_times) * 1000
+
+    # print(f"Micro-P={micro_precision:.4f} | "
+    #       f"Micro-R={micro_recall:.4f} | "
+    #       f"Micro-F1={micro_f1:.4f} | "
+    #       f"AUC={auc:.4f} | "
+    #       f"Avg batch time={avg_batch_time_ms:.2f} ms")
 
     return {
-        "micro_f1": micro_f,
-        "micro_p": micro_p,
-        "micro_r": micro_r,
-        "macro_f1": macro_f,
-        "macro_p": macro_p,
-        "macro_r": macro_r,
-        "macro_auc": macro_auc,
-        "avg_time_ms": avg_time * 1000,  # convert to milliseconds
+        "micro_f1": micro_f1.item(),
+        "micro_p": micro_precision.item(),
+        "micro_r": micro_recall.item(),
+        "auc": auc,
+        "avg_time_ms": avg_batch_time_ms
     }
 
 
 def print_comparison_table(results):
-    """Pretty‑print a comparison table including AUC."""
-    print("\n" + "=" * 80)
-    header = (f"{'Model':<12} {'Micro-F1':>8} {'Micro-P':>8} {'Micro-R':>8} "
-              f"{'Macro-F1':>8} {'Macro-P':>8} {'Macro-R':>8} "
-              f"{'Macro-AUC':>10} {'Time (ms)':>10}")
+    """Pretty-print comparison table for micro metrics + AUC."""
+
+    print("\n" + "=" * 70)
+
+    header = (f"{'Model':<15}"
+              f"{'Micro-F1':>10}"
+              f"{'Micro-P':>10}"
+              f"{'Micro-R':>10}"
+              f"{'AUC':>10}"
+              f"{'Time (ms)':>12}")
+
     print(header)
-    print("-" * 80)
+    print("-" * 70)
+
     for model_name, metrics in results.items():
-        print(
-            f"{model_name:<12} {metrics['micro_f1']:>8.3f} {metrics['micro_p']:>8.3f} "
-            f"{metrics['micro_r']:>8.3f} {metrics['macro_f1']:>8.3f} "
-            f"{metrics['macro_p']:>8.3f} {metrics['macro_r']:>8.3f} "
-            f"{metrics['macro_auc']:>10.3f} {metrics['avg_time_ms']:>10.2f}")
-    print("=" * 80)
+        print(f"{model_name:<15}"
+              f"{metrics['micro_f1']:>10.3f}"
+              f"{metrics['micro_p']:>10.3f}"
+              f"{metrics['micro_r']:>10.3f}"
+              f"{metrics['auc']:>10.3f}"
+              f"{metrics['avg_time_ms']:>12.2f}")
+
+    print("=" * 70)
 
 
 def main():
@@ -190,6 +204,11 @@ def main():
         type=float,
         default=0.5,
         help="Score threshold for binary prediction (default: 0.5)")
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=8,
+        help="Score threshold for binary prediction (default: 0.5)")
     parser.add_argument("--device",
                         type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu",
@@ -203,6 +222,16 @@ def main():
     print(
         f"Test set: {len(test_data)} samples, {len(global_labels)} unique labels."
     )
+    test_dataset = ZeroShotDataset(samples=test_data,
+                                   all_labels=global_labels,
+                                   max_num_negatives=5,
+                                   is_train=True)
+
+    # Create dataloaders
+    test_loader = DataLoader(test_dataset,
+                             batch_size=args.batch_size,
+                             shuffle=False,
+                             collate_fn=collate_fn)
 
     # Load models
     models = {}
@@ -234,11 +263,12 @@ def main():
     results = {}
     for name, model in models.items():
         print(f"\nEvaluating {name}...")
-        metrics = evaluate_model(model,
-                                 test_data,
-                                 global_labels,
-                                 device=args.device,
-                                 threshold=args.threshold)
+        metrics = benchmark_model(
+            model=model,
+            dataloader=test_loader,
+            device=args.device,
+            threshold=args.threshold,
+        )
         results[name] = metrics
 
     # Print comparison

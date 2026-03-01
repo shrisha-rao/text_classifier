@@ -28,8 +28,8 @@ class BiEncoderModel(nn.Module):
         hidden_size = self.shared_encoder.config.hidden_size  # 768 for bert
         self.projection = nn.Linear(hidden_size, hidden_size // 3,
                                     bias=False)  # 768, 256
-        # self.temperature = nn.Parameter(
-        #     torch.tensor(0.07))  # for stabily on small datasets
+        self.temperature = nn.Parameter(
+            torch.tensor(0.1))  # for stabily on small datasets
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_num_labels = max_num_labels
@@ -115,7 +115,7 @@ class BiEncoderModel(nn.Module):
         scores = torch.bmm(padded_label_embeddings,
                            text_embeddings.unsqueeze(2)).squeeze(
                                2)  # [B, max_num_labels]
-        scores = scores  # / self.temperature
+        scores = scores / self.temperature
         return scores, mask
 
     @torch.no_grad()
@@ -143,8 +143,7 @@ class BiEncoderModel(nn.Module):
         self.tokenizer.save_pretrained(save_dir)
         torch.save(self.projection.state_dict(), save_dir / 'projection.pt')
         if hasattr(self, 'temperature'):
-            torch.save(self.temperature.state_dict(),
-                       save_dir / 'temperature.pt')
+            torch.save(self.temperature, save_dir / 'temperature.pt')
 
     @classmethod
     def from_pretrained(cls, path, max_num_labels=None):
