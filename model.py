@@ -29,9 +29,7 @@ class BiEncoderModel(nn.Module):
         hidden_size = self.shared_encoder.config.hidden_size  # 768 for bert
         self.projection = nn.Linear(hidden_size, hidden_size // 3,
                                     bias=False)  # 768, 256
-        self.temperature = nn.Parameter(
-            torch.tensor(0.1))  # for stabily on small datasets
-
+        self.temperature = nn.Parameter(torch.tensor(0.1))
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_num_labels = max_num_labels
         self.config = BertConfig.from_pretrained(model_name)
@@ -160,7 +158,7 @@ class BiEncoderModel(nn.Module):
         model.tokenizer = AutoTokenizer.from_pretrained(load_dir)
         model.projection.load_state_dict(torch.load(load_dir /
                                                     'projection.pt'))
-        tmp_path = load_dir / 'temperature./pt'
+        tmp_path = load_dir / 'temperature.pt'
         if tmp_path.exists():
             model.temperature.data = torch.load(temp_path)
         return model

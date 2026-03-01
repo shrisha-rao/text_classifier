@@ -35,13 +35,7 @@ class PolyencoderModel(nn.Module):
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # # projection layer
-        # hidden_size = self.shared_encoder.config.hidden_size  # 768 for bert
-        # self.projection = nn.Linear(hidden_size, hidden_size // 3,
-        #                             bias=False)  # 768, 256
-        # self.temperature = nn.Parameter(
-        #     torch.tensor(0.1))  # for stabily on small datasets
-
+        self.temperature = nn.Parameter(torch.tensor(0.1))
         self.max_num_labels = max_num_labels
         self.num_global_vectors = num_global_vectors
 
@@ -143,8 +137,8 @@ class PolyencoderModel(nn.Module):
         scores_raw = torch.matmul(padded_label_embeddings,
                                   text_global_contexts.transpose(1, 2))
 
-        temperature = 0.5  # low: sharp attention (~max) high: smooth att
-        scores_raw = scores_raw / temperature
+        # temperature = 0.5  # low: sharp attention (~max) high: smooth att
+        scores_raw = scores_raw / self.temperature
         # Soft attention over global vectors
         attn_weights = torch.softmax(scores_raw -
                                      scores_raw.max(dim=-1, keepdim=True)[0],
@@ -187,11 +181,8 @@ class PolyencoderModel(nn.Module):
         # Save poly-specific params
         torch.save({'global_vectors': self.global_vectors},
                    save_dir / "poly_extra.pt")
-        # Save config
-        # config = PretrainedConfig.from_pretrained(path)  # load existing
-        # config.max_num_labels = self.max_num_labels
-        # config.num_global_vectors = self.num_global_vectors
-        # config.save_pretrained(path)
+        if hasattr(self, 'temperature'):
+            torch.save(self.temperature, save_dir / 'temperature.pt')
 
     @classmethod
     def from_pretrained(cls, path):
@@ -229,4 +220,5 @@ class PolyencoderModel(nn.Module):
         model.tokenizer = AutoTokenizer.from_pretrained(path)
         extra = torch.load(f"{path}/poly_extra.pt")
         model.global_vectors = nn.Parameter(extra['global_vectors'])
+        model.temperature.data = torch.load(f'{path}/temperature.pt')
         return model
