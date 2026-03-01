@@ -186,11 +186,7 @@ class PolyencoderModel(nn.Module):
 
     @classmethod
     def from_pretrained(cls, path):
-        print(path)
-        #config = PretrainedConfig.from_pretrained(path)
-
         default_base_model_name = "bert-base-uncased"
-
         try:
             config = AutoConfig.from_pretrained(path)
         except ValueError:
