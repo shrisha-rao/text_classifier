@@ -165,6 +165,6 @@ class BiEncoderModel(nn.Module):
         model.projection.load_state_dict(torch.load(load_dir /
                                                     'projection.pt'))
         tmp_path = load_dir / 'temperature./pt'
-        if tmp_path.exist():
+        if tmp_path.exists():
             model.temperature.data = torch.load(temp_path)
         return model
