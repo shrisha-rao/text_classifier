@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer, BertConfig
+from huggingface_hub import snapshot_download
 from pathlib import Path
 
 
@@ -138,8 +139,15 @@ class BiEncoderModel(nn.Module):
 
     @classmethod
     def from_pretrained(cls, path):
+        # check if local path exists. If not, download from Hub.
+        if not os.path.isdir(path_or_repo_id):
+            print(f"Resolving {path_or_repo_id} from Hugging Face Hub...")
+            # This downloads the repo to the HF cache and returns the cache directory path
+            local_dir = snapshot_download(repo_id=path_or_repo_id)
+        else:
+            local_dir = path_or_repo_id
 
-        load_dir = Path(path)
+        load_dir = Path(local_dir)
 
         # Load config
         config = BertConfig.from_pretrained(load_dir)
