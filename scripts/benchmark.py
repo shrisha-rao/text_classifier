@@ -123,8 +123,10 @@ def benchmark_model(model, dataloader, device, threshold=0.5):
     # ---- Concatenate all batches ----
     probs = torch.cat(all_probs)
     targets = torch.cat(all_targets)
+    opt_t, opt_f1 = compute_optimal_threshold(targets, probs)
 
-    preds = (probs >= threshold).float()
+    preds = (probs >= opt_t).float()
+    # preds = (probs >= threshold).float()
 
     # ---- Micro metrics ----
     TP = (preds * targets).sum()
