@@ -134,6 +134,11 @@ class PolyencoderModel(nn.Module):
 
         # 4. Compute scores (Late Interaction)
         # scores_raw: [B, max_label, num_global]
+        padded_label_embeddings = nn.functional.normalize(
+            padded_label_embeddings, p=2, dim=-1)
+        text_global_contexts = nn.functional.normalize(text_global_contexts,
+                                                       p=2,
+                                                       dim=-1)
         scores_raw = torch.matmul(padded_label_embeddings,
                                   text_global_contexts.transpose(1, 2))
 
