@@ -1,7 +1,7 @@
 model:
   name: "bert-base-uncased"    # "prajjwal1/bert-tiny" # 
   max_num_labels: 5 # hard cap 
-  num_global_vectors: 32 # used only for poly
+  num_global_vectors: 64 # used only for poly
   layers_to_freeze: 8
 
   
