@@ -143,10 +143,11 @@ class PolyencoderModel(nn.Module):
         scores_raw = torch.matmul(padded_label_embeddings,
                                   text_global_contexts.transpose(1, 2))
 
-        temperature = 0.1  # low: sharp attention (~max) high: smooth att
+        temperature = 0.5  # low: sharp attention (~max) high: smooth att
         scores_raw = scores_raw / temperature
         # Soft attention over global vectors
-        attn_weights = torch.softmax(scores_raw,
+        attn_weights = torch.softmax(scores_raw -
+                                     scores_raw.max(dim=-1, keepdim=True)[0],
                                      dim=-1)  # [B, max_label, num_global]
         scores = (attn_weights * scores_raw).sum(dim=-1)  # [B, max_label]
         return scores, mask
