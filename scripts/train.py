@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim import AdamW
 from transformers import get_linear_schedule_with_warmup
 from dataset import ZeroShotDataset
-from model2 import BiEncoderModel
+from model import BiEncoderModel
 from polyencoder import PolyencoderModel
 import os
 import argparse
