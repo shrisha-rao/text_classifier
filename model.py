@@ -142,12 +142,12 @@ class BiEncoderModel(nn.Module):
         from huggingface_hub import snapshot_download
         import os
         # check if local path exists. If not, download from Hub.
-        if not os.path.isdir(path_or_repo_id):
-            print(f"Resolving {path_or_repo_id} from Hugging Face Hub...")
-            # This downloads the repo to the HF cache and returns the cache directory path
-            local_dir = snapshot_download(repo_id=path_or_repo_id)
+        if not os.path.isdir(path):
+            print(f"Resolving {path} from hf...")
+            # downloads the repo to the HF cache and returns the cache directory path
+            local_dir = snapshot_download(repo_id)
         else:
-            local_dir = path_or_repo_id
+            local_dir = path
 
         load_dir = Path(local_dir)
 
