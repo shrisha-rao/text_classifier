@@ -14,7 +14,8 @@ import numpy as np
 import torch
 from sklearn.metrics import f1_score, precision_recall_fscore_support, roc_auc_score, precision_recall_curve
 from dataset import ZeroShotDataset
-from model import BiEncoderModel  #, PolyencoderModel
+from model import BiEncoderModel
+from polyencoder import PolyencoderModel
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -250,9 +251,8 @@ def main():
 
     try:
         print("Loading polyencoder model...")
-        # from polyencoder import PolyencoderModel
-        # models["Polyencoder"] = PolyencoderModel.from_pretrained(
-        #     args.poly_model)
+        models["Polyencoder"] = PolyencoderModel.from_pretrained(
+            args.poly_model)
     except Exception as e:
         import traceback
         traceback.print_exc()
