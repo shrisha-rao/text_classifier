@@ -1,0 +1,28 @@
+model:
+  name: "bert-base-uncased"    # "prajjwal1/bert-tiny" # 
+  max_num_labels: 5 # hard cap 
+
+training:
+  epochs: 5 # Shift from 'steps' to 'epochs' for better tracking
+  num_steps: 1000 # max number of optimizer steps 
+  batch_size: 8
+  layers_to_freeze: 11
+  gradient_accumulation_steps: 8 #4 # Effective batch size 8 x 4 = 16
+  learning_rate: 2e-5 # 3e-5
+  weight_decay: 0.01 # prevent overfitting
+  warmup_ratio: 0.1 # 10% of total training for warmup
+  max_grad_norm: 1.0 # Gradient clipping to prevent grad explosion
+  log_steps: 50
+  eval_steps: 50 # Evaluate every ~12 batches of gradient accumulation
+  save_steps: 100 
+  # save_total_limit: 2 # Only keep the best and latest to save disk space
+  early_stop_patience: 3
+  early_stop_min_delta: 1e-4
+  
+data:
+  synthetic_data_path: "data/synthetic_training_data.json"
+  max_num_negatives: 10 
+  max_seq_length: 128 
+
+logging:
+  tensorboard_dir: "runs"
