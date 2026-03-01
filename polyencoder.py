@@ -147,7 +147,7 @@ class PolyencoderModel(nn.Module):
 
         # Max over global vectors
         scores, _ = scores.max(dim=-1)  # [B, max_label]
-
+        # scores = scores / self.temperature
         return scores, mask
 
     @torch.no_grad()

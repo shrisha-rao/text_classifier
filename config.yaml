@@ -7,6 +7,7 @@ training:
   num_steps: 1000 # max number of optimizer steps 
   batch_size: 8
   layers_to_freeze: 11
+  num_global_vectors: 32 # used only for poly
   gradient_accumulation_steps: 8 #4 # Effective batch size 8 x 4 = 16
   learning_rate: 2e-5 # 3e-5
   weight_decay: 0.01 # prevent overfitting

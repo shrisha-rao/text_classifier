@@ -257,6 +257,7 @@ def validation_and_log(model, val_loader, global_step, writer, device, loss_fn,
 def train():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
+
     parser.add_argument("--model_type", choices=["bi", "poly"], default="bi")
     args = parser.parse_args()
 
@@ -279,7 +280,8 @@ def train():
     else:
         model = PolyencoderModel(config["model"]["name"],
                                  int(config["model"]["max_num_labels"]),
-                                 int(config['data']['max_seq_length']))
+                                 int(config['data']['max_seq_length']),
+                                 int(config['model']['num_global_vectors']))
     model.to(device)
 
     # Inside the train() function, replacing the optimizer/scheduler section:
