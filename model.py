@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer, BertConfig
-from huggingface_hub import snapshot_download
+
 from pathlib import Path
 
 
@@ -139,6 +139,8 @@ class BiEncoderModel(nn.Module):
 
     @classmethod
     def from_pretrained(cls, path):
+        from huggingface_hub import snapshot_download
+        import os
         # check if local path exists. If not, download from Hub.
         if not os.path.isdir(path_or_repo_id):
             print(f"Resolving {path_or_repo_id} from Hugging Face Hub...")
