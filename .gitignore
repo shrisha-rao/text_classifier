@@ -1,0 +1,81 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+pythonenv*
+
+# PyCharm / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+notebooks/dev_local_training.ipynb
+Untitled1.ipynb
+
+# Hugging Face cache
+.huggingface/
+cache/
+*.h5
+*.pth
+*.pt
+*.bin
+
+# Model checkpoints
+checkpoints/
+best_model.pt
+*.ckpt
+
+# TensorBoard logs
+runs/
+logs/
+
+# Data files
+data/*.json
+!data/example.json # a small example
+!data/synthetic_training_data.json
+!data/synthetic_test_data.json
+
+# Configuration files
+*.yaml
+!config.yaml   # keep the default config
+
+# Output files
+*.log
+*.out
+*.err
+
+# macOS
+.DS_Store
+
+# Python distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# PyPI
+.pypirc
+
+
+# Jupyter
+.ipynb_checkpoints
+
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+*.*~
+*~
+.Trash-0/

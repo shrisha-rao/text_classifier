@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  jupyter:
+    build: .
+    container_name: zero-shot-text_classifier
+    ports:
+      - "8888:8888" # jupyter
+      - "6006:6006" # tensorboard
+    volumes:
+      - .:/workspace
+    environment:
+      - PYTHONPATH=/workspace
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
