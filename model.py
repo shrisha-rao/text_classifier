@@ -6,16 +6,9 @@ from pathlib import Path
 
 class BiEncoderModel(nn.Module):
 
-    def __init__(self,
-                 model_name,
-                 max_num_labels,
-                 max_seq_length=128,
-                 layers_to_freeze=11):
+    def __init__(self, model_name, max_num_labels, layers_to_freeze=11):
         super().__init__()
-        # self.shared_encoder = AutoModel.from_pretrained(model_name)
-        self.shared_encoder = AutoModel.from_pretrained(model_name,
-                                                        low_cpu_mem_usage=True,
-                                                        dtype="auto")
+        self.shared_encoder = AutoModel.from_pretrained(model_name)
         # freeze embeddings
         for param in self.shared_encoder.embeddings.parameters():
             param.requires_grad = False
@@ -34,14 +27,13 @@ class BiEncoderModel(nn.Module):
         self.max_num_labels = max_num_labels
         self.config = BertConfig.from_pretrained(model_name)
         self.config.max_num_labels = max_num_labels  # store custom attr
-        self.max_seq_length = max_seq_length
 
     def encode(self, texts_or_labels):
         inputs = self.tokenizer(texts_or_labels,
                                 return_tensors='pt',
                                 padding=True,
-                                truncation=True,
-                                max_length=self.max_seq_length)
+                                truncation=True)
+
         # Move inputs to same device as model
         inputs = {
             k: v.to(self.shared_encoder.device)
@@ -133,7 +125,6 @@ class BiEncoderModel(nn.Module):
         save_dir = Path(path)
         self.config.max_num_labels = self.max_num_labels
         self.shared_encoder.config.max_num_labels = self.max_num_labels
-        self.shared_encoder.max_seq_length = self.max_seq_length
         self.shared_encoder.save_pretrained(save_dir)
         self.tokenizer.save_pretrained(save_dir)
         torch.save(self.projection.state_dict(), save_dir / 'projection.pt')

@@ -275,12 +275,10 @@ def train():
         print(f"loading model: {config['model']['name']}")
         model = BiEncoderModel(
             config["model"]["name"], int(config["model"]["max_num_labels"]),
-            int(config['data']['max_seq_length']),
             int(config['model']['layers_to_freeze'])).to(device)
     else:
         model = PolyencoderModel(config["model"]["name"],
                                  int(config["model"]["max_num_labels"]),
-                                 int(config['data']['max_seq_length']),
                                  int(config['model']['layers_to_freeze']),
                                  int(config['model']['num_global_vectors']))
     model.to(device)

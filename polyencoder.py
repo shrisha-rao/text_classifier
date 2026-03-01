@@ -18,7 +18,6 @@ class PolyencoderModel(nn.Module):
     def __init__(self,
                  model_name,
                  max_num_labels,
-                 max_seq_length,
                  layers_to_freeze=11,
                  num_global_vectors=16):
         super().__init__()
@@ -43,14 +42,12 @@ class PolyencoderModel(nn.Module):
         self.global_vectors = nn.Parameter(
             torch.randn(num_global_vectors,
                         self.shared_encoder.config.hidden_size))
-        self.max_seq_length = max_seq_length
 
     def encode_text(self, texts):
         inputs = self.tokenizer(texts,
                                 return_tensors='pt',
                                 padding=True,
-                                truncation=True,
-                                max_length=self.max_seq_length)
+                                truncation=True)
         inputs = {
             k: v.to(self.shared_encoder.device)
             for k, v in inputs.items()
@@ -180,7 +177,6 @@ class PolyencoderModel(nn.Module):
         save_dir = Path(path)
         self.shared_encoder.config.max_num_labels = self.max_num_labels
         self.shared_encoder.config.num_global_vectors = self.num_global_vectors
-        self.shared_encoder.max_seq_length = self.max_seq_length
         self.shared_encoder.save_pretrained(save_dir)
         self.tokenizer.save_pretrained(save_dir)
         # Save poly-specific params
