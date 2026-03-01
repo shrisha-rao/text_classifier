@@ -25,6 +25,7 @@ class BiEncoderModel(nn.Module):
                 param.requires_grad = False
         print(f'Embedding and first {layers_to_freeze} forzen')
 
+        # projection layer
         hidden_size = self.shared_encoder.config.hidden_size  # 768 for bert
         self.projection = nn.Linear(hidden_size, hidden_size // 3,
                                     bias=False)  # 768, 256
@@ -74,14 +75,10 @@ class BiEncoderModel(nn.Module):
 
         # Encode texts
         text_embeddings = self.encode(texts)  # [B, D]
-
         label_counts = [len(labels) for labels in batch_labels]
-        #self.max_num_labels = self.max_num_labels  # hard cap
-
         # Find the dynamic limit for inference, but keep hard cap for training
         # limit = self.max_num_labels if self.training else max(
         #     (len(l) for l in batch_labels), default=1)
-
         limit = min(self.max_num_labels,
                     max((len(l) for l in batch_labels), default=1))
 

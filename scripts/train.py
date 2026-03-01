@@ -264,7 +264,8 @@ def train():
         config = yaml.safe_load(f)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    writer = SummaryWriter(config["logging"]["tensorboard_dir"])
+    writer = SummaryWriter(config["logging"]["tensorboard_dir"] +
+                           f'/{args.model_type}')
 
     # Dataset
     train_loader, val_loader, test_loader = load_and_split_data(config)
