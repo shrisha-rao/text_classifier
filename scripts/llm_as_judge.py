@@ -115,7 +115,7 @@ if __name__ == "__main__":
         }
     }]
 
-    # API key set as environment variable OPENAI_API_KEY
+    # API key set as environment variable OPENAI_API_KEY #
     # import os; os.environ["OPENAI_API_KEY"] = "abc"
     judgments = llm_as_judge(example_predictions, model="gpt-4o")
     for j in judgments:
