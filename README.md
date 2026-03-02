@@ -39,7 +39,7 @@ Trained both models with 8 frozen layers
 
 
 ## USAGE 
-See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb
+See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb)
 
 
 ## Data
@@ -64,5 +64,3 @@ The Polyencoder shows a small boost in F1 and AUC with minimal impact on latency
 | **BiEncoder** | 0.840 | 0.809 | 0.874 | 0.925 | **61.44** |
 | **Polyencoder** | **0.863** | **0.851** | **0.876** | **0.941** | 61.73 |
 
-
-)
