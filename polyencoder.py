@@ -18,7 +18,7 @@ class PolyencoderModel(nn.Module):
     def __init__(self,
                  model_name,
                  max_num_labels,
-                 layers_to_freeze=11,
+                 layers_to_freeze=8,
                  num_global_vectors=16):
         super().__init__()
         self.shared_encoder = AutoModel.from_pretrained(model_name)
@@ -210,50 +210,3 @@ class PolyencoderModel(nn.Module):
         model.load_state_dict(state_dict)
 
         return model
-
-    # def save_pretrained(self, path):
-    #     save_dir = Path(path)
-    #     self.shared_encoder.config.max_num_labels = self.max_num_labels
-    #     self.shared_encoder.config.num_global_vectors = self.num_global_vectors
-    #     self.shared_encoder.save_pretrained(save_dir)
-    #     self.tokenizer.save_pretrained(save_dir)
-    #     # Save poly-specific params
-    #     torch.save({'global_vectors': self.global_vectors},
-    #                save_dir / "poly_extra.pt")
-    #     if hasattr(self, 'temperature'):
-    #         torch.save(self.temperature, save_dir / 'temperature.pt')
-
-    # @classmethod
-    # def from_pretrained(cls, path):
-    #     default_base_model_name = "bert-base-uncased"
-    #     try:
-    #         config = AutoConfig.from_pretrained(path)
-    #     except ValueError:
-    #         # Fallback: If the saved config is broken, load the base config
-    #         # but apply the state dict from the path later
-    #         print(
-    #             f"Warning: Could not determine model type from {path}. Falling back to bert-base-uncased."
-    #         )
-    #         config = AutoConfig.from_pretrained(default_base_model_name)
-
-    #     try:
-    #         max_num_labels = getattr(config, 'max_num_labels', 5)
-    #         num_global_vectors = getattr(config, 'num_global_vectors', 16)
-    #     except Exception:
-    #         max_num_labels = 5
-    #         num_global_vectors = 16
-
-    #     base_model_name = getattr(config, '_name_or_path', None)
-    #     if not base_model_name:
-    #         base_model_name = getattr(config, 'model_type',
-    #                                   default_base_model_name)
-    #         if not base_model_name:
-    #             base_model_name = default_base_model_name
-
-    #     model = cls(config._name_or_path, max_num_labels, num_global_vectors)
-    #     model.shared_encoder = AutoModel.from_pretrained(path, config=config)
-    #     model.tokenizer = AutoTokenizer.from_pretrained(path)
-    #     extra = torch.load(f"{path}/poly_extra.pt")
-    #     model.global_vectors = nn.Parameter(extra['global_vectors'])
-    #     model.temperature.data = torch.load(f'{path}/temperature.pt')
-    #     return model

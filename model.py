@@ -7,7 +7,7 @@ from pathlib import Path
 
 class BiEncoderModel(nn.Module):
 
-    def __init__(self, model_name, max_num_labels, layers_to_freeze=11):
+    def __init__(self, model_name, max_num_labels, layers_to_freeze=8):
         super().__init__()
         self.shared_encoder = AutoModel.from_pretrained(model_name)
         # freeze embeddings
