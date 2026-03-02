@@ -202,7 +202,6 @@ class PolyencoderModel(nn.Module):
         # Initialize model
         model = cls(model_name=load_dir,
                     max_num_labels=max_num_labels,
-                    max_seq_length=getattr(config, "max_seq_length", 128),
                     num_global_vectors=num_global_vectors)
 
         # Load full state_dict

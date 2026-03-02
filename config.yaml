@@ -26,7 +26,7 @@ data:
   synthetic_data_path: "data/synthetic_training_data.json"
   max_num_negatives: 10 
   max_seq_length: 128
-  random_seed: 4242
+  random_seed: 1729
 
 logging:
   tensorboard_dir: "runs"
