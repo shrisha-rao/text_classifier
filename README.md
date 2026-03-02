@@ -47,6 +47,10 @@ Trained both models with 8 frozen layers
 ## USAGE 
 See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb)
 
+  - Loads model from hf
+  - Runs inference with example inputs 
+  - Calls llm_as_judge with the output if both the models 
+
 
 ## Data
 See notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/generate_synthetic_openai.ipynb)
