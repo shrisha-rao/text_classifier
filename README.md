@@ -38,6 +38,12 @@ See notebook:[![Open In Colab](https://colab.research.google.com/assets/colab-ba
 Trained both models with 8 frozen layers
 
 
+### Trained model pushed to HF with gated access
+
+	- * [![BiEncoder on HF](https://img.shields.io/badge/%F0%9F%A4%97-Model%20on%20Hub-orange)](https://huggingface.co/sraob/my_bi_encoder) (Gated Access)
+	- * [![PolyEncoder on HF](https://img.shields.io/badge/%F0%9F%A4%97-Model%20on%20Hub-orange)](https://huggingface.co/sraob/my_poly_encoder) (Gated Access)
+
+
 ## USAGE 
 See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb)
 
@@ -64,3 +70,21 @@ The Polyencoder shows a small boost in F1 and AUC with minimal impact on latency
 | **BiEncoder** | 0.840 | 0.809 | 0.874 | 0.925 | **61.44** |
 | **Polyencoder** | **0.863** | **0.851** | **0.876** | **0.941** | 61.73 |
 
+
+## Model Architectures
+
+1. Bi-Encoder (model.py)
+
+The Bi-Encoder maps the input text and candidate labels into a shared high-dimensional vector space independently.
+
+	- **Encoder**: A shared BERT backbone for both text and labels.
+	- **Aggregation**: Mask-Aware Pooling (Mean Pooling) converts token-level embeddings into a single global vector.
+	- **Interaction**: A simple Dot Product followed by a Sigmoid activation to calculate the similarity score between the text vector and each label vector.
+ 
+2. Poly-Encoder (polyencoder.py)
+
+The Poly-Encoder improves on the Bi-Encoder by using late interaction between the text and labels, capturing more nuanced semantic relationships.
+
+	- **Text Representation**: Instead of one vector, the text is represented by $m$ (=64) Context Codes (learned embeddings that attend to the BERT output).
+	- **Attention Mechanism**: The label embedding acts as a Query to perform attention over the $m$ text context codes.
+	- **Interaction**: This produces a label-specific context vector, which is then used to compute the final score by computing a dot product.
