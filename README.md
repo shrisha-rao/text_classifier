@@ -7,6 +7,8 @@ Zero shot text classification system. It has **BiEncoder** and **Polyencoder** v
 ```text
 repo
 ├── data/                                  # Synthetic training and test datasets
+│   ├── synthetic_training_data.json
+│   └── synthetic_test_data.json
 ├── notebooks/
 │   ├── Demo_Usage.ipynb                   # Quick start and model inference demo
 │   └── ZS_text_classifier_training.ipynb  # Full training walkthrough
@@ -24,6 +26,22 @@ repo
 └── requirements.txt                       # Python dependencies
 ```
 
+
+
+## Training 
+See notebook:[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/ZS_text_classifier_training.ipynb)
+ - Runs training of Biencoder and polyencoder
+ - Includes tensorborad logging of training 
+ - runs benchmark script 
+ - Pushes models to Hugging Face
+ 
+Trained both models with 8 frozen layers
+
+
+## USAGE 
+See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb
+
+
 ## Data
 See notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/generate_synthetic_openai.ipynb)
 
@@ -36,18 +54,6 @@ Synthetic data generated with
  - Train: 5000 samples 
  - Test: 500 samples
 	
-
-## Training 
-See notebook:[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/ZS_text_classifier_training.ipynb)
- - Runs training of Biencoder and polyencoder
- - Includes tensorborad logging of training 
- - runs benchmark script 
- - Pushes models to Hugging Face
- 
-Trained both models with 8 frozen layers
-
-## USAGE 
-See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb
 
 ## Benchmarks
 The models were evaluated on a synthetic test set with lables unseen during training
