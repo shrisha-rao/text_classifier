@@ -77,14 +77,14 @@ The Polyencoder shows a small boost in F1 and AUC with minimal impact on latency
 
 The Bi-Encoder maps the input text and candidate labels into a shared high-dimensional vector space independently.
 
-	- **Encoder**: A shared BERT backbone for both text and labels.
-	- **Aggregation**: Mask-Aware Pooling (Mean Pooling) converts token-level embeddings into a single global vector.
-	- **Interaction**: A simple Dot Product followed by a Sigmoid activation to calculate the similarity score between the text vector and each label vector.
+  - **Encoder**: A shared BERT backbone for both text and labels.
+  - **Aggregation**: Mask-Aware Pooling (Mean Pooling) converts token-level embeddings into a single global vector.
+  - **Interaction**: A simple Dot Product followed by a Sigmoid activation to calculate the similarity score between the text vector and each label vector.
  
 2. Poly-Encoder (polyencoder.py)
 
 The Poly-Encoder improves on the Bi-Encoder by using late interaction between the text and labels, capturing more nuanced semantic relationships.
 
-	- **Text Representation**: Instead of one vector, the text is represented by $m$ (=64) Context Codes (learned embeddings that attend to the BERT output).
-	- **Attention Mechanism**: The label embedding acts as a Query to perform attention over the $m$ text context codes.
-	- **Interaction**: This produces a label-specific context vector, which is then used to compute the final score by computing a dot product.
+  - **Text Representation**: Instead of one vector, the text is represented by $m$ (=64) Context Codes (learned embeddings that attend to the BERT output).
+  - **Attention Mechanism**: The label embedding acts as a Query to perform attention over the $m$ text context codes.
+  - **Interaction**: This produces a label-specific context vector, which is then used to compute the final score by computing a dot product.
