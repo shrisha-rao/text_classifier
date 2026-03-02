@@ -1,3 +1,50 @@
+"""
+Training script for zero-shot multi-label text classification.
+
+This module implements the full training and evaluation pipeline for 
+BiEncoder and PolyEncoder architectures in a zero-shot learning setting (defined in model.py and polyencoder.py respectively).
+The goal is to classify input texts into multiple possible labels, including 
+labels not seen during training.
+
+Main features:
+-------------
+- Deterministic train/validation/test split
+- Dynamic negative sampling for zero-shot learning
+- Support for Bi-Encoder and Poly-Encoder models
+- Multi-label classification with BCE loss
+- Gradient accumulation and gradient clipping
+- Learning rate warmup and linear decay scheduler
+- TensorBoard logging for training diagnostics
+- Early stopping based on validation performance
+- Checkpoint saving (latest and best models)
+- Evaluation on a held-out test set
+
+Pipeline:
+--------
+1. Load synthetic dataset from a JSON file. (path in config.yaml)
+2. Split into train, validation, and test sets.
+3. Build global label set from the training data.
+4. Train the selected model with negative sampling.
+5. Monitor performance using F1-score and AUC.
+6. Save checkpoints and apply early stopping.
+7. Evaluate the final model on the test set.
+
+Usage:
+-----
+Run the script from the command line:
+
+    python train.py --config config.yaml --model_type bi
+
+Arguments:
+---------
+--config : Path to YAML configuration file.
+--model_type : Type of encoder model ("bi" or "poly").
+
+Reproducibility:
+---------------
+Random seeds and dataset shuffling controlled by seed set in config.yaml
+"""
+
 import json
 import random
 
@@ -14,263 +61,33 @@ import os
 import argparse
 from sklearn.metrics import f1_score, roc_auc_score
 
-
-def collate_fn(batch):
-    texts = [item["text"] for item in batch]
-    labels = [item["labels"] for item in batch]
-    targets = [item["targets"] for item in batch]
-    return {"texts": texts, "labels": labels, "targets": targets}
-
-
-def load_and_split_data(config):
-    """Load JSON and split into train/val/test."""
-    data_path = config["data"]["synthetic_data_path"]
-
-    with open(data_path) as f:
-        samples = json.load(f)
-
-    # from datasets import load_dataset
-    # dataset = load_dataset("reuters21578", "ModHayes", trust_remote_code=True)
-    # samples = []
-    # for ex in dataset["train"]:
-    #     if ex["topics"]:  # Skip empty
-    #         samples.append({"text": ex["text"], "labels": ex["topics"]})
-
-    print(f"Total raw samples in JSON: {len(samples)}")
-    print(f"first sample: {samples[0]['text']} {samples[0]['labels']}")
-
-    # Shuffle deterministically
-    random.seed(config["data"].get("random_seed", 42))
-    random.shuffle(samples)
-
-    total = len(samples)
-    train_ratio = config["data"].get("train_split", 0.8)
-    val_ratio = config["data"].get("val_split", 0.1)
-    test_ratio = config["data"].get("test_split", 0.1)
-
-    train_end = int(train_ratio * total)
-    val_end = train_end + int(val_ratio * total)
-
-    train_samples = samples[:train_end]
-    val_samples = samples[train_end:val_end]
-    test_samples = samples[val_end:]
-
-    # Build global label set from training set only (to avoid leakage)
-    all_labels = list(set(lbl for s in train_samples for lbl in s["labels"]))
-    max_num_negatives = int(config["data"]["max_num_negatives"])
-    # Create datasets
-    train_dataset = ZeroShotDataset(samples=train_samples,
-                                    all_labels=all_labels,
-                                    max_num_negatives=max_num_negatives,
-                                    is_train=True)
-    val_dataset = ZeroShotDataset(samples=val_samples,
-                                  all_labels=all_labels,
-                                  max_num_negatives=max_num_negatives,
-                                  is_train=True)
-    test_dataset = ZeroShotDataset(samples=test_samples,
-                                   all_labels=all_labels,
-                                   max_num_negatives=max_num_negatives,
-                                   is_train=True)
-
-    # Create dataloaders
-    train_loader = DataLoader(train_dataset,
-                              batch_size=config["training"]["batch_size"],
-                              shuffle=True,
-                              collate_fn=collate_fn)
-    val_loader = DataLoader(val_dataset,
-                            batch_size=config["training"]["batch_size"],
-                            shuffle=False,
-                            collate_fn=collate_fn)
-    test_loader = DataLoader(test_dataset,
-                             batch_size=config["training"]["batch_size"],
-                             shuffle=False,
-                             collate_fn=collate_fn)
-
-    print(f"#trainL: {len(train_loader)} #val: {len(val_loader)}")
-    return train_loader, val_loader, test_loader
-
-
-def eval_on_test(test_loader, model_type, loss_fn):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    try:
-        if model_type == 'bi':
-            model = BiEncoderModel.from_pretrained('checkpoints/bi/latest')
-        else:
-            model = PolyencoderModel.from_pretrained('checkpoints/poly/latest')
-        #
-        model.to(device)
-        model.eval()
-        test_loss = 0.0
-        with torch.no_grad():
-            for test_batch in test_loader:
-                texts = test_batch["texts"]
-                labels = test_batch["labels"]
-                targets = test_batch["targets"]
-                scores, mask = model(texts, labels)
-                target_tensor = torch.zeros_like(scores, device=device)
-                for i, tgt_list in enumerate(targets):
-                    max_labels = min(len(tgt_list), model.max_num_labels)
-                    target_tensor[i, :max_labels] = torch.tensor(
-                        tgt_list[:max_labels], device=device)
-                loss = loss_fn(scores[mask], target_tensor[mask])
-                test_loss += loss.item() * len(texts)  # sum losses
-        #
-        avg_test_loss = test_loss / len(test_loader.dataset)
-        print(f"test loss = {avg_test_loss:.4f}")
-    except Exception as e:
-        print('Error in eval on test')
-        print(e)
-
-
-def log_neg_sampling_ratio(targets, global_step, writer, device):
-    # log sampling stats for the current target batch
-    pos_counts = [sum(t == 1.0 for t in sample) for sample in targets]
-    neg_counts = [len(sample) - p for sample, p in zip(targets, pos_counts)]
-    pos_mean = torch.tensor(pos_counts, dtype=torch.float32,
-                            device=device).mean()
-    neg_mean = torch.tensor(neg_counts, dtype=torch.float32,
-                            device=device).mean()
-    ratio = neg_mean / (pos_mean + 1e-8)
-    writer.add_scalar("sampling/neg_pos_ratio", ratio.item(), global_step)
-
-
-def log_update_to_data_ratio(model, scheduler, global_step, writer):
-    # update-to-data ratio layer by layer ref. Karpathy
-    # If this metric drops down to -5.0, the model is essentially frozen.
-    # If it spikes up to -1.0, learning rate is too aggressive
-    # the model is super noisy
-    current_lr = scheduler.get_last_lr()[0]
-    layer_ratios = {}  # dictionary for per layer scalars
-    log_ratios_list = []  # for global average
-    with torch.no_grad():
-        for name, p in model.named_parameters():
-            if p.grad is not None:
-                update_norm = (current_lr * p.grad).norm()
-                param_norm = p.data.norm()
-
-                # update_norm = (current_lr * p.grad).std()
-                # param_norm = p.data.std()
-
-                if param_norm > 0 and update_norm > 0:
-                    log10_ratio = (update_norm /
-                                   (param_norm + 1e-8)).log10().item()
-                    # Store for per‑layer overlay
-                    layer_ratios[name] = log10_ratio
-                    log_ratios_list.append(log10_ratio)
-
-    # overlay all per layer ratios in one plot
-    if layer_ratios:
-        writer.add_scalars('diagnostics/update_ratio', layer_ratios,
-                           global_step)
-
-    # global average
-    if log_ratios_list:
-        avg_log_ratio = sum(log_ratios_list) / len(log_ratios_list)
-        writer.add_scalar('diagnostics/update_ratio_avg', avg_log_ratio,
-                          global_step)
-
-
-def multi_label_softmax_loss(scores, targets, mask):
-    # 1. remove padded labels from softmax
-    scores = scores.masked_fill(~mask, -1e9)
-
-    # 2. log softmax across labels
-    log_probs = torch.nn.functional.log_softmax(scores, dim=1)
-
-    # 3. multi-positive cross entropy
-    loss = -(targets * log_probs)
-
-    # 4. ignore padding
-    loss = (loss * mask).sum() / mask.sum()
-
-    return loss
-
-
-from sklearn.metrics import f1_score, roc_auc_score
-
-
-def validation_and_log(model, val_loader, global_step, writer, device, loss_fn,
-                       model_type):
-    model.eval()
-    val_loss = 0.0
-
-    all_logits = []
-    all_targets = []
-
-    with torch.no_grad():
-        for val_batch in val_loader:
-            val_texts = val_batch["texts"]
-            val_labels = val_batch["labels"]
-            val_targets_list = val_batch["targets"]
-
-            scores, mask = model(val_texts, val_labels)
-
-            # Build target tensor
-            target_tensor = torch.zeros_like(scores, device=device)
-            for i, tgt_list in enumerate(val_targets_list):
-                max_labels = min(len(tgt_list), model.max_num_labels)
-                target_tensor[i, :max_labels] = torch.tensor(
-                    tgt_list[:max_labels], device=device)
-
-            # Compute loss (mask padded positions)
-            loss = loss_fn(scores[mask], target_tensor[mask])
-            val_loss += loss.item() * len(val_texts)
-
-            # Accumulate for metrics
-            all_logits.append(scores[mask].cpu())
-            all_targets.append(target_tensor[mask].cpu())
-
-    # Average validation loss
-    avg_val_loss = val_loss / len(val_loader.dataset)
-
-    # Concatenate all batches
-    all_logits = torch.cat(all_logits)
-    all_targets = torch.cat(all_targets)
-
-    # Probabilities and predictions
-    val_probs = torch.sigmoid(all_logits).numpy()
-    val_preds = (val_probs >= 0.5).astype(int)
-    targets_np = all_targets.numpy()
-
-    # Metrics
-    micro_f1 = f1_score(targets_np, val_preds, average='micro')
-    macro_f1 = f1_score(targets_np, val_preds, average='macro')
-    try:
-        auc = roc_auc_score(targets_np, val_probs)
-    except ValueError:
-        auc = 0.0
-
-    # Log
-
-    writer.add_scalars(f"loss/{model_type}", {"val": avg_val_loss},
-                       global_step)
-    writer.add_scalar("metrics/micro_f1", micro_f1, global_step)
-    writer.add_scalar("metrics/macro_f1", macro_f1, global_step)
-    writer.add_scalar("metrics/auc", auc, global_step)
-
-    print(f"Step {global_step}: val_loss={avg_val_loss:.4f} | "
-          f"micro-F1={micro_f1:.4f} | macro-F1={macro_f1:.4f} | AUC={auc:.4f}")
-
-    return avg_val_loss
+# helper functions for the training loop
+from scripts.utils import set_seed, collate_fn, load_and_split_data, eval_on_test, log_neg_sampling_ratio, log_update_to_data_ratio, validation_and_log
 
 
 def train():
+    # Get training arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
-
     parser.add_argument("--model_type", choices=["bi", "poly"], default="bi")
     args = parser.parse_args()
 
+    # read config
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
+    # set random seed
+    set_seed(config)
+
+    # set device and setup tensorboard for logging
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     writer = SummaryWriter(config["logging"]["tensorboard_dir"] +
                            f'/{args.model_type}')
 
-    # Dataset
+    # load dataset
     train_loader, val_loader, test_loader = load_and_split_data(config)
-    # Model
+
+    # load model
     if args.model_type == "bi":
         print(f"loading model: {config['model']['name']}")
         model = BiEncoderModel(
@@ -283,22 +100,20 @@ def train():
                                  int(config['model']['num_global_vectors']))
     model.to(device)
 
-    # Inside the train() function, replacing the optimizer/scheduler section:
-
-    # 1. Calculate total steps correctly for the scheduler
+    # Calculate total steps correctly for the scheduler
     epochs = int(config["training"].get("epochs", 5))
     accumulation_steps = int(config["training"].get(
         "gradient_accumulation_steps", 1))
     total_steps = len(train_loader) * epochs // accumulation_steps
     print(f"total steps: {total_steps}")
 
-    # 2. Add weight decay to the optimizer
+    # Add weight decay to the optimizer
     optimizer = AdamW(model.parameters(),
                       lr=float(config["training"]["learning_rate"]),
                       weight_decay=config["training"].get(
                           "weight_decay", 0.01))
 
-    # 3. Use warmup_ratio instead of hardcoded steps
+    # Use warmup_ratio
     warmup_steps = int(total_steps *
                        config["training"].get("warmup_ratio", 0.1))
     scheduler = get_linear_schedule_with_warmup(optimizer,
@@ -306,7 +121,7 @@ def train():
                                                 num_training_steps=total_steps)
 
     # Loss function
-    pos_weight = torch.tensor([2.8])
+    pos_weight = torch.tensor([float(config['training']['pos_weight'])])
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(device)
     # loss_fn = multi_label_softmax_loss()
 
@@ -320,7 +135,6 @@ def train():
     best_val_loss = float('inf')
     epochs_without_improve = 0.
     for epoch in range(epochs):
-        # while global_step < config["training"]["num_steps"]:
         model.train()
         optimizer.zero_grad()  # start accumulation cycle
         for i, batch in enumerate(train_loader):
@@ -329,28 +143,11 @@ def train():
             targets = batch["targets"]  # list of lists of floats
 
             if global_step % int(config['training']['eval_steps']) == 0:
-                log_neg_sampling_ratio(targets, global_step, writer, device)
+                log_neg_sampling_ratio(targets, global_step, writer, device,
+                                       args.model_type)
 
             # ---------- Forward Pass  ----------
             scores, mask = model(texts, labels)  # scores: [B, max_labels]
-
-            # print(f"Scores range: {scores.min():.3f} → {scores.max():.3f}")
-            # print(
-            #     f"Labels mean:  {torch.tensor([t for sublist in targets for t in sublist]).float().mean():.3f}"
-            # )  # should be << 1.0
-            # print(f"Mask ratio:  {mask.float().mean():.3f}"
-            #       )  # fraction valid labels
-            # print(
-            #     f"Loss inputs match: {scores.shape == targets.shape == mask.shape}"
-            # )
-            # # Then compute loss manually:
-            # valid_scores = scores[mask]
-            # valid_labels = torch.tensor(
-            #     [t for sublist in targets for t in sublist])[mask]
-
-            # print(
-            #     f"Valid scores: {valid_scores.min():.3f} → {valid_scores.max():.3f}"
-            # )
 
             # Create target tensor of same shape as scores
             target_tensor = torch.zeros_like(scores, device=device)
@@ -361,7 +158,6 @@ def train():
 
             # Compute loss only on masked positions
             loss = loss_fn(scores[mask], target_tensor[mask])
-
             # loss = multi_label_softmax_loss(scores, targets, mask)
 
             loss.backward()
@@ -375,7 +171,7 @@ def train():
 
                 if global_step > 20:  # some warmup period
                     log_update_to_data_ratio(model, scheduler, global_step,
-                                             writer)
+                                             writer, args.model_type)
 
                 # update params
                 optimizer.step()
@@ -389,7 +185,7 @@ def train():
                 #                   global_step)
                 writer.add_scalars(f"loss/{args.model_type}",
                                    {"train": loss.item()}, global_step)
-                writer.add_scalar(f"lr",
+                writer.add_scalar(f"lr/{args.model_type}",
                                   scheduler.get_last_lr()[0], global_step)
 
                 print(f"Step {global_step}: loss = {loss.item():.4f}")
@@ -455,8 +251,6 @@ def train():
         if global_step >= config["training"]["num_steps"]:
             break
 
-    # Push best model to hub
-    # model.push_to_hub("your-username/bi-encoder-zero-shot")  # after implementing
     writer.close()
     eval_on_test(test_loader, args.model_type, loss_fn)
 
