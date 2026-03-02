@@ -25,23 +25,24 @@ repo
 ```
 
 ## Data
-See notebook:
+See notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/generate_synthetic_openai.ipynb)
+
+
 Synthetic data generated with
 
  - Generated 50 total labels
     - Train labels: 40 (no overlap with test)
 	- Test labels:  10 (zero-shot evaluation)
- - Text 
-    - 5000
- - Train
-	- 500
+ - Train: 5000 samples 
+ - Test: 500 samples
 	
 
 ## Training 
-See notebook: notebooks/ZS_text_classifier_training.ipynb
+See notebook:[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/ZS_text_classifier_training.ipynb)
  - Runs training of Biencoder and polyencoder
  - Includes tensorborad logging of training 
  - runs benchmark script 
+ - Pushes models to Hugging Face
  
 Trained both models with 8 frozen layers
 
@@ -57,5 +58,5 @@ The Polyencoder shows a small boost in F1 and AUC with minimal impact on latency
 | **Polyencoder** | **0.863** | **0.851** | **0.876** | **0.941** | 61.73 |
 
 
-## LLM as judge
-See Notebook
+## USAGE 
+See Notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/Demo_Usage.ipynb)
