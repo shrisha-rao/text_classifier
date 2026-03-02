@@ -32,7 +32,7 @@ repo
 ## Training 
 See notebook:[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shrisha-rao/text_classifier/blob/main/notebooks/ZS_text_classifier_training.ipynb)
  - Runs training of Biencoder and polyencoder
- - Includes tensorborad logging of training 
+ - Includes tensorborad logging of training
  - runs benchmark script 
  - Pushes models to Hugging Face
  
