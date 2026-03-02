@@ -195,12 +195,13 @@ class PolyencoderModel(nn.Module):
         if os.path.isdir(path):
             load_dir = Path(path)
             weights_path = load_dir / "polyencoder.pt"
+
         else:
             # It's a Hub ID: download the config and the specific weights file
             weights_path = hf_hub_download(repo_id=path,
                                            filename="polyencoder.pt")
 
-        # load_dir = Path(path)
+        load_dir = Path(path)
 
         # Load config
         config = AutoConfig.from_pretrained(load_dir)
