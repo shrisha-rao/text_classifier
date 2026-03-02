@@ -190,8 +190,17 @@ class PolyencoderModel(nn.Module):
 
     @classmethod
     def from_pretrained(cls, path):
+        from huggingface_hub import hf_hub_download
+        import os
+        if os.path.isdir(path):
+            load_dir = Path(path)
+            weights_path = load_dir / "polyencoder.pt"
+        else:
+            # It's a Hub ID: download the config and the specific weights file
+            weights_path = hf_hub_download(repo_id=path,
+                                           filename="polyencoder.pt")
 
-        load_dir = Path(path)
+        # load_dir = Path(path)
 
         # Load config
         config = AutoConfig.from_pretrained(load_dir)
@@ -205,8 +214,9 @@ class PolyencoderModel(nn.Module):
                     num_global_vectors=num_global_vectors)
 
         # Load full state_dict
-        state_dict = torch.load(load_dir / "polyencoder.pt",
-                                map_location="cpu")
+        state_dict = torch.load(weights_path,
+                                map_location="cpu",
+                                weights_only=True)
         model.load_state_dict(state_dict)
 
         return model
