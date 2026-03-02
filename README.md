@@ -24,6 +24,7 @@ repo
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt                       # Python dependencies
+├── figs_training                          # Figures form training logs: loss, metrics, lr
 ```
 
 
