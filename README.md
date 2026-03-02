@@ -41,7 +41,7 @@ Trained both models with 8 frozen layers
 ### Trained model pushed to HF with gated access
 
 * BiEncoder: [![BiEncoder on HF](https://img.shields.io/badge/%F0%9F%A4%97-Model%20on%20Hub-orange)](https://huggingface.co/sraob/my_bi_encoder) (Gated Access)
-* PolyEncoder: [![PolyEncoder on HF](https://img.shields.io/badge/%F0%9F%A4%97-Model%20on%20Hub-orange)](https://huggingface.co/sraob/my_poly_encoder) (Gated Access)
+* PolyEncoder: [![PolyEncoder on HF](https://img.shields.io/badge/%F0%9F%A4%97-Model%20on%20Hub-orange)](https://huggingface.co/sraob/my_poly_enc) (Gated Access)
 
 
 ## USAGE 
