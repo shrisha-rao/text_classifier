@@ -26,7 +26,10 @@ def llm_as_judge(predictions: List[Dict],
             - "error": (optional) if the API call failed
     """
     # initialize openAI client
-    client = OpenAI()
+    if openai_api_key:
+        client = OpenAI(openai_api_key=openai_api_key)
+    else:
+        client = OpenAI()
 
     # prompt template
     prompt_template = """You are an expert judge of text classification systems.
